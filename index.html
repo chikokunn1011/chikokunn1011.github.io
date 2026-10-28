@@ -64,15 +64,10 @@ body {
 .work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
 @media (max-width: 820px) { .work { grid-template-columns: minmax(0, 1fr); } }
 
-.screen { background: #1f5f8b; padding: 28px 24px; display: grid; gap: 16px; align-content: center; color: #fff; }
-.screen .hud { display: flex; justify-content: space-between; font-size: 14px; }
-.screen .hearts { color: #ff8f86; letter-spacing: 2px; }
-.screen .q { text-align: center; font-size: 17px; }
-canvas.flag { width: min(220px, 70%); aspect-ratio: 3 / 2; margin: 0 auto; display: block; image-rendering: pixelated; box-shadow: 0 0 0 4px #fff, 6px 6px 0 4px rgba(0,0,0,.25); }
-.screen .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
-.screen .choices span { background: rgba(255,255,255,.14); padding: 6px 8px; text-align: center; font-size: 14px; box-shadow: 0 0 0 2px rgba(255,255,255,.5); }
-.screen .choices span.ok { background: #fff; color: #1f5f8b; }
-.screen .choices span.ok::before { content: "▶"; margin-right: 4px; }
+.screen { background: #1f5f8b; padding: 28px 20px; display: grid; gap: 14px; align-content: center; justify-items: center; color: #fff; }
+.screen canvas { width: 100%; max-width: 480px; height: auto; image-rendering: pixelated; display: block; }
+.screen .cap { font-size: 14px; letter-spacing: .12em; opacity: .9; }
+.screen .cap b { color: #ffd34d; font-weight: 400; }
 
 .info { padding: clamp(22px, 4vw, 40px); display: grid; gap: 18px; align-content: start; min-width: 0; }
 .info .no { font-size: 13px; color: var(--muted); }
@@ -120,13 +115,8 @@ footer a { color: var(--accent); }
   <main style="display:grid;gap:36px">
     <article class="work win">
       <div class="screen" aria-hidden="true">
-        <div class="hud"><span>Q 7/10</span><span class="hearts">♥♥♥</span></div>
-        <div class="q">このこっきは どこのくに？</div>
-        <canvas class="flag" id="flag" width="18" height="12"></canvas>
-        <div class="choices">
-          <span>スウェーデン</span><span class="ok">フィンランド</span>
-          <span>ノルウェー</span><span>アイスランド</span>
-        </div>
+        <canvas id="thumb" width="141" height="86"></canvas>
+        <div class="cap">COLLECT <b>195</b> FLAGS</div>
       </div>
       <div class="info">
         <div class="no">No.001</div>
@@ -158,10 +148,47 @@ footer a { color: var(--accent); }
 </div>
 
 <script>
-// 18×12ドットのフィンランド国旗
-const c = document.getElementById("flag").getContext("2d");
-c.fillStyle = "#ffffff"; c.fillRect(0, 0, 18, 12);
-c.fillStyle = "#002f6c"; c.fillRect(0, 4, 18, 3); c.fillRect(5, 0, 3, 12);
+// ドット絵の国旗コレクション（1マス 15×10ドット、7×5枚）
+(() => {
+  const cv = document.getElementById("thumb"), c = cv.getContext("2d");
+  const W = 15, H = 10, G = 3, M = 9, COLS = 7;
+  const R = "#d52b1e", Wh = "#ffffff", B = "#0039a6", Y = "#fcd116", Gr = "#009a44", K = "#1c1c1c", N = "#002f6c", O = "#ff883e";
+  const px = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  const hz = cols => (x, y) => cols.forEach((col, i) => { const a = Math.round(i * H / cols.length), b = Math.round((i + 1) * H / cols.length); px(x, y + a, W, b - a, col); });
+  const vt = cols => (x, y) => cols.forEach((col, i) => { const a = Math.round(i * W / cols.length), b = Math.round((i + 1) * W / cols.length); px(x + a, y, b - a, H, col); });
+  const disc = (bg, col, cx, r, base) => (x, y) => {
+    (base || ((x, y) => px(x, y, W, H, bg)))(x, y);
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if ((i + .5 - cx) ** 2 + (j + .5 - H / 2) ** 2 <= r * r) px(x + i, y + j, 1, 1, col);
+  };
+  const nordic = (bg, cr, inner) => (x, y) => {
+    px(x, y, W, H, bg); px(x, y + 3, W, 4, cr); px(x + 4, y, 4, H, cr);
+    if (inner) { px(x, y + 4, W, 2, inner); px(x + 5, y, 2, H, inner); }
+  };
+  const swiss = (x, y) => { px(x, y, W, H, R); px(x + 6, y + 2, 3, 6, Wh); px(x + 4, y + 4, 7, 2, Wh); };
+  const flags = [
+    hz([K, R, Y]), vt([B, Wh, R]), disc(Wh, "#bc002d", 7.5, 3), nordic(Wh, N), vt([Gr, Wh, R]), hz([R, Wh]), hz(["#0057b7", "#ffd700"]),
+    nordic("#006aa7", "#fecc00"), vt([Gr, Wh, O]), hz([R, Wh, B]), swiss, vt([K, Y, R]), nordic(R, Wh), hz([Wh, B, R]),
+    hz([R, Wh, B, B, Wh, R]), disc("#006a4e", "#f42a41", 6.5, 3), nordic(R, Wh, N), hz([Y, Y, B, R]), disc(Y, Y, 0, 0, hz([R, "#002868", "#002868", R])), hz([R, Wh, R]), nordic(B, Wh, R),
+    vt([Gr, Wh, Gr]), hz([Y, Gr, R]), hz([Wh, Gr, R]), vt([B, Y, R]), hz(["#0072ce", K, Wh]), disc("#4aadd6", "#ffde00", 6, 3), vt([Gr, Y, R]),
+    hz([R, B, O]), vt([R, Y, Gr]), hz([R, Wh, K]), hz([Gr, Y, B]), hz([Gr, Wh, B]), hz([R, Wh, "#00a3dd"]), hz([R, Y, Gr])
+  ];
+  flags[18] = (x, y) => { hz([R, "#002868", "#002868", R])(x, y); for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if ((i + .5 - 7.5) ** 2 + (j + .5 - 5) ** 2 <= 4.4) px(x + i, y + j, 1, 1, Wh); };
+  const pos = i => [M + (i % COLS) * (W + G), M + Math.floor(i / COLS) * (H + G)];
+  function draw(sel) {
+    px(0, 0, cv.width, cv.height, "#1f5f8b");
+    flags.forEach((f, i) => {
+      const [x, y] = pos(i), up = i === sel ? 1 : 0;
+      px(x + 1, y + 1, W, H, "#123c5a");
+      f(x - up, y - up);
+    });
+    const [x, y] = pos(sel);
+    c.strokeStyle = "#ffd34d"; c.lineWidth = 1; c.strokeRect(x - 2.5, y - 2.5, W + 3, H + 3);
+    px(x + W / 2 - 2, y + H + 2, 3, 1, "#ffd34d"); px(x + W / 2 - 1, y + H + 3, 1, 1, "#ffd34d");
+  }
+  let sel = 2;
+  draw(sel);
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(() => { sel = (sel + 1 + Math.floor(Math.random() * 5)) % flags.length; draw(sel); }, 1100);
+})();
 </script>
 </body>
 </html>
