@@ -138,9 +138,34 @@ footer a { color: var(--accent); }
       </div>
     </article>
 
+    <article class="work win">
+      <div class="screen" style="background:#24443a" aria-hidden="true">
+        <canvas id="thumb2" width="141" height="86"></canvas>
+        <div class="cap"><b>1295</b> WORDS IN THE NOTE</div>
+      </div>
+      <div class="info">
+        <div class="no">No.002</div>
+        <h2>塾の学習ノート</h2>
+        <div class="sub">STUDY NOTES</div>
+        <p>塾の授業・宿題・小テストで使う学習サイトの入り口。中学英単語ノートや国旗マスターを1か所にまとめてる。</p>
+        <dl class="status">
+          <div><dt>しゅうろく</dt><dd>2 サイト</dd></div>
+          <div><dt>えいたんご</dt><dd>1295 語</dd></div>
+          <div><dt>みため</dt><dd>4 しゅるい</dd></div>
+        </dl>
+        <div class="items">
+          <h3>できること</h3>
+          <ul>
+            <li>教科でしぼる</li><li>見た目きりかえ</li><li>音声と例文</li><li>テスト印刷</li><li>QRで範囲を配る</li>
+          </ul>
+        </div>
+        <a class="cta" href="https://chikokunn1011.github.io/study/" target="_blank" rel="noopener">ひらいてみる</a>
+      </div>
+    </article>
+
     <div class="next win">
       <span>つぎの作品を つくっているところ…</span>
-      <b>No.002 ？？？</b>
+      <b>No.003 ？？？</b>
     </div>
   </main>
 
@@ -188,6 +213,55 @@ footer a { color: var(--accent); }
   let sel = 2;
   draw(sel);
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(() => { sel = (sel + 1 + Math.floor(Math.random() * 5)) % flags.length; draw(sel); }, 1100);
+})();
+</script>
+<script>
+// ドット絵のノート。えんぴつが1行ずつ書いていく
+(() => {
+  const cv = document.getElementById("thumb2"), c = cv.getContext("2d");
+  const px = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  const NX = 36, NY = 7, NW = 74, NH = 72, LINE = 8, TOP = NY + 14;
+  // 1行ぶんの「文字」の長さ（決まった並び）
+  const rows = [[5, 3, 6, 4, 7], [4, 6, 3, 5, 5], [6, 3, 4, 7, 3], [3, 5, 6, 4, 6], [7, 4, 3, 5, 4], [5, 5, 4, 6, 3]];
+  const total = rows.reduce((n, r) => n + r.reduce((a, b) => a + b + 2, 0), 0);
+  function pencil(x, y) {
+    // 右上に向かうえんぴつ（芯がペン先）
+    px(x, y, 1, 1, "#2e2a33");
+    px(x + 1, y - 1, 1, 1, "#e8c9a0");
+    for (let i = 0; i < 7; i++) {
+      const col = i < 5 ? "#f2b632" : i < 6 ? "#c9c9c9" : "#ef8a8a";
+      px(x + i + 2, y - i - 3, 2, 2, col);
+    }
+  }
+  function draw(n) {
+    px(0, 0, cv.width, cv.height, "#24443a");
+    px(NX + 2, NY + 2, NW, NH, "#17302a");
+    px(NX, NY, NW, NH, "#fbfcfe");
+    for (let y = TOP; y < NY + NH - 2; y += LINE) px(NX, y, NW, 1, "#c9d6ee");
+    px(NX + 10, NY, 1, NH, "#e58b8b");
+    for (let y = NY + 4; y < NY + NH - 2; y += 6) { px(NX - 4, y, 6, 2, "#9aa3b5"); px(NX - 4, y, 2, 2, "#5d6781"); }
+    // はなまる
+    const hx = NX + NW - 12, hy = NY + 7;
+    for (let a = 0; a < 40; a++) { const t = a / 40 * Math.PI * 2; px(Math.round(hx + Math.cos(t) * 5), Math.round(hy + Math.sin(t) * 4), 1, 1, "#d23a3a"); }
+    px(hx - 1, hy - 1, 3, 3, "#d23a3a");
+    let left = n, tip = null;
+    rows.forEach((r, i) => {
+      let x = NX + 14; const y = TOP - 4 + i * LINE;
+      r.forEach(len => {
+        for (let k = 0; k < len; k++) {
+          if (left-- <= 0) return;
+          const h = (k * 7 + i * 3 + len) % 3 === 0 ? 3 : 2;
+          px(x + k, y + 3 - h, 1, h, "#1d2740"); tip = [x + k + 1, y + 3];
+        }
+        x += len + 2; left -= 2;
+      });
+    });
+    if (tip && n < total) pencil(tip[0], tip[1]);
+  }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { draw(total); return; }
+  let n = 0;
+  setInterval(() => { n = n > total + 30 ? 0 : n + 1; draw(Math.min(n, total)); }, 60);
+  draw(0);
 })();
 </script>
 </body>
