@@ -91,6 +91,14 @@ body {
   padding: 10px 22px; font-size: 17px;
   box-shadow: 0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), 4px 8px 0 0 var(--ink);
 }
+button.cta { border: 0; font: inherit; font-size: 17px; cursor: pointer; }
+.lock { display: grid; gap: 10px; padding: 14px 16px; border: 2px dashed var(--ink); }
+.lock label { font-size: 14px; }
+.lock .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lock input { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 2px solid var(--ink); border-radius: 0; padding: 4px 10px; min-width: 0; flex: 1 1 160px; }
+.lock input:focus-visible, .lock button:focus-visible { outline: 3px dashed var(--accent); outline-offset: 2px; }
+.lock button { font: inherit; font-size: 15px; background: var(--ink); color: var(--paper); border: 0; padding: 4px 16px; cursor: pointer; }
+.lock .msg { margin: 0; font-size: 14px; min-height: 1.5em; color: var(--red); }
 .cta::before { content: "▶ "; }
 .cta:hover { transform: translate(2px, 2px); box-shadow: 0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), 2px 4px 0 0 var(--ink); }
 .cta:focus-visible { outline: 3px dashed var(--accent); outline-offset: 8px; }
@@ -141,25 +149,33 @@ footer a { color: var(--accent); }
     <article class="work win">
       <div class="screen" style="background:#24443a" aria-hidden="true">
         <canvas id="thumb2" width="141" height="86"></canvas>
-        <div class="cap"><b>3</b> SITES IN ONE NOTE</div>
+        <div class="cap"><b>5</b> SITES IN ONE NOTE</div>
       </div>
       <div class="info">
         <div class="no">No.002</div>
         <h2>学習ノート</h2>
         <div class="sub">STUDY NOTES</div>
-        <p>授業や宿題で使う学習サイトの入り口。中学英単語ノート・中学数学プリント・国旗マスターの3つをまとめてて、ノート・黒板・ポップ・大きな文字の4つの見た目から選べる。</p>
+        <p>授業や宿題で使う学習サイトの入り口。英単語・漢字・数学プリント・計算ゲーム・国旗クイズの5つをまとめてて、ノートや黒板、レトロゲームなど11の見た目から選べる。</p>
         <dl class="status">
-          <div><dt>しゅうろく</dt><dd>3 サイト</dd></div>
-          <div><dt>えいたんご</dt><dd>1295 語</dd></div>
-          <div><dt>みため</dt><dd>4 しゅるい</dd></div>
+          <div><dt>しゅうろく</dt><dd>5 サイト</dd></div>
+          <div><dt>きょうか</dt><dd>4 つ</dd></div>
+          <div><dt>みため</dt><dd>11 しゅるい</dd></div>
         </dl>
         <div class="items">
           <h3>できること</h3>
           <ul>
-            <li>教科でしぼる</li><li>見た目きりかえ</li><li>英単語の音声と例文</li><li>数学プリント</li><li>テストの印刷</li><li>QRで範囲を配る</li>
+            <li>教科でしぼる</li><li>見た目きりかえ</li><li>英単語1295語</li><li>漢字500問</li><li>数学プリント</li><li>テストの印刷</li><li>QRで範囲を配る</li><li>要望・不具合を送る</li>
           </ul>
         </div>
-        <a class="cta" href="https://chikokunn1011.github.io/study/" target="_blank" rel="noopener">ひらいてみる</a>
+        <button type="button" class="cta" id="lock-open" aria-expanded="false" aria-controls="lock">ひらいてみる</button>
+        <form class="lock" id="lock" hidden>
+          <label for="lock-pw">🔒 ひらくにはパスワードがいるよ</label>
+          <div class="row">
+            <input id="lock-pw" type="password" autocomplete="off" required>
+            <button type="submit">けってい</button>
+          </div>
+          <p class="msg" id="lock-msg" aria-live="polite"></p>
+        </form>
       </div>
     </article>
 
@@ -262,6 +278,36 @@ footer a { color: var(--accent); }
   let n = 0;
   setInterval(() => { n = n > total + 30 ? 0 : n + 1; draw(Math.min(n, total)); }, 60);
   draw(0);
+})();
+</script>
+<script>
+// 学習ノートのかぎ：パスワードから鍵を作って、暗号化したURLをもどす（ソースにはパスワードもURLも置かない）
+(() => {
+  const L = {"s": "HscEiU4Znp537M2afycDeQ==", "i": "W+CO3SaxS4IGATw8", "d": "9ecNisDby3zw26cRYmU+mJharzeXM0rLNEjXCinhpp4IaOSTJXoKiEMfqVzT5uOEG/YPd5Tk"};
+  const btn = document.getElementById("lock-open"), form = document.getElementById("lock");
+  const pw = document.getElementById("lock-pw"), msg = document.getElementById("lock-msg");
+  const bin = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+  btn.addEventListener("click", () => {
+    form.hidden = !form.hidden;
+    btn.setAttribute("aria-expanded", String(!form.hidden));
+    if (!form.hidden) pw.focus();
+  });
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    msg.textContent = "しらべてるよ…";
+    try {
+      const te = new TextEncoder(), s = crypto.subtle;
+      const base = await s.importKey("raw", te.encode(pw.value), "PBKDF2", false, ["deriveKey"]);
+      const key = await s.deriveKey({ name: "PBKDF2", salt: bin(L.s), iterations: 200000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+      const url = new TextDecoder().decode(await s.decrypt({ name: "AES-GCM", iv: bin(L.i) }, key, bin(L.d)));
+      const a = document.createElement("a");
+      a.className = "cta"; a.href = url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "学習ノートをひらく";
+      form.replaceWith(a); btn.remove(); a.focus();
+    } catch {
+      msg.textContent = "パスワードがちがうみたい。もういちど入れてね";
+      pw.select();
+    }
+  });
 })();
 </script>
 </body>
