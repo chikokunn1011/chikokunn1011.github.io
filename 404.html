@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<script>/* 引っ越し：学習ノートの各サイト（/study/ /math/ など）は chiko-studia.pages.dev へ。
+   リポジトリを非公開にして GitHub Pages が止まったあと、古いURLはこの 404 に来るので転送する。
+   初回だけ、この端末の localStorage（学習の記録・設定）を # に入れて運ぶ（各サイトの引っ越しスクリプトと同じ形） */
+(function () {
+  var SITES = ['study','english-words','eiken','idioms','verbs','plurals','grammar','math','math-high','puzzle',
+    'japanese','kobun','science','science-print','physics','chemistry','elements','social','prefecture','world-map'];
+  var NEW = 'https://chiko-studia.pages.dev', K = '__move=', MAX = 1500000;
+  var seg = location.pathname.split('/')[1] || '';
+  if (SITES.indexOf(seg) < 0) return;
+  var path = location.pathname === '/' + seg ? '/' + seg + '/' : location.pathname;
+  var h = location.hash.slice(1), frag = h ? '#' + h : '';
+  try {
+    if (window.top === window && !localStorage.getItem('studia:moved')) {
+      var d = {}, n = 0;
+      for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); d[k] = localStorage.getItem(k); n++; }
+      var s = encodeURIComponent(JSON.stringify(d));
+      if (n && s.length < MAX) frag = '#' + K + s + (h ? '&h=' + encodeURIComponent(h) : '');
+      localStorage.setItem('studia:moved', String(Date.now()));
+    }
+  } catch (e) {}
+  location.replace(NEW + path + location.search + frag);
+})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ページが見つからないよ | Chiko Log</title>
+<style>
+:root { --bg: #e6dfcc; --ink: #2a2a3a; --red: #c8463c; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1e2030; --ink: #ece6d4; } }
+body { margin: 0; min-height: 100vh; display: grid; place-content: center; gap: 16px; text-align: center;
+  background: var(--bg); color: var(--ink); font-family: "DotGothic16", system-ui, sans-serif; padding: 24px; }
+a { color: var(--red); }
+</style>
+</head>
+<body>
+  <p>ページが見つからないよ。</p>
+  <p><a href="/">Chiko Log にもどる</a></p>
+</body>
+</html>
