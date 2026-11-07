@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<script>/* 引っ越し：学習ノートの各サイト（/study/ /math/ など）は chiko-studia.pages.dev へ。
+<script>/* 引っ越し：学習ノートの各サイト（/study/ /math/ など）と計算ゲートラン（/calcus/）は chiko-studia.pages.dev へ。
    リポジトリを非公開にして GitHub Pages が止まったあと、古いURLはこの 404 に来るので転送する。
    初回だけ、この端末の localStorage（学習の記録・設定）を # に入れて運ぶ（各サイトの引っ越しスクリプトと同じ形） */
 (function () {
   var SITES = ['study','english-words','eiken','idioms','verbs','plurals','grammar','math','math-high','puzzle',
-    'japanese','kobun','science','science-print','physics','chemistry','elements','social','prefecture','world-map'];
+    'japanese','kobun','science','science-print','physics','chemistry','elements','social','prefecture','world-map','calcus'];
   var NEW = 'https://chiko-studia.pages.dev', K = '__move=', MAX = 1500000;
   var seg = location.pathname.split('/')[1] || '';
   if (SITES.indexOf(seg) < 0) return;
