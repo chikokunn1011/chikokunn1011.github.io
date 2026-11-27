@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D塾経営シミュレーション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Maru+Gothic:wght@400;700&display=swap">
+<style>
+/* 黒板の世界で統一（単一テーマ）。左に3Dの塾、右に黒板の経営パネル、イベントは紙の「お知らせプリント」 */
+:root{
+  --board:#24443a; --board-deep:#1a3129; --chalk:#f3f1e7; --chalk-dim:#a9bdb1;
+  --yellow:#f2d35b; --pink:#f29a9a; --mint:#93dcb4; --wood:#8a5a33; --paper:#fbfaf2; --ink:#22302b;
+  --font-display:"Yusei Magic","Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  --font-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--board-deep);color:var(--chalk);font-family:var(--font-body);font-size:14px;line-height:1.55;overflow:hidden}
+#app{height:100%;display:grid;grid-template-rows:auto 1fr;position:relative}
+.disp{font-family:var(--font-display);font-weight:400}
+button{font-family:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+
+/* ---- HUD ---- */
+#hud{background:var(--board);border-bottom:7px solid var(--wood);padding:8px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px}
+#hud .who{display:flex;align-items:baseline;gap:10px;min-width:0}
+#h-name{font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:14em}
+.chip{font-size:12px;border:1px solid var(--chalk-dim);border-radius:99px;padding:0 9px;color:var(--chalk-dim);white-space:nowrap}
+#hud .date{min-width:150px}
+#h-date{font-size:17px;color:var(--yellow);white-space:nowrap}
+.prog{height:3px;background:rgba(243,241,231,.18);margin-top:3px;border-radius:2px;overflow:hidden}
+#h-prog{display:block;height:100%;width:0;background:var(--chalk)}
+.stats{display:flex;gap:18px;margin:0}
+.stats div{display:flex;flex-direction:column}
+.stats dt{font-size:11px;color:var(--chalk-dim);letter-spacing:.08em}
+.stats dd{margin:0;font-family:var(--font-display);font-size:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats dd small{font-size:12px;color:var(--chalk-dim)}
+.spd{margin-left:auto;display:flex;gap:4px}
+.spd button{background:none;border:1.5px solid rgba(243,241,231,.4);border-radius:5px;padding:4px 10px;font-size:13px}
+.spd button.on{background:var(--yellow);border-color:var(--yellow);color:var(--ink);font-weight:700}
+.spd button:hover{border-color:var(--chalk)}
+
+/* ---- 本体 ---- */
+main{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:0}
+#stage{position:relative;min-height:0;min-width:0;background:#cfe9f7;overflow:hidden}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl:active{cursor:grabbing}
+#nogl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--ink)}
+#nogl[hidden]{display:none}
+#hint{position:absolute;top:10px;left:12px;font-size:12px;background:rgba(26,49,41,.72);padding:3px 10px;border-radius:99px;pointer-events:none}
+#camreset{position:absolute;top:8px;right:10px;background:rgba(26,49,41,.8);border:1px solid rgba(243,241,231,.4);border-radius:5px;padding:3px 10px;font-size:12px}
+#legend{position:absolute;right:10px;bottom:10px;display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:flex-end;font-size:11px;background:rgba(26,49,41,.8);padding:5px 10px;border-radius:6px;max-width:60%}
+#legend span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+#legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+#log{position:absolute;left:10px;bottom:10px;width:min(46%,430px);max-height:104px;overflow-y:auto;background:rgba(26,49,41,.82);border-radius:6px;padding:5px 10px;font-size:12px}
+#log div{padding:1px 0;border-bottom:1px dotted rgba(243,241,231,.15)}
+#log div:first-child{color:var(--yellow)}
+.float{position:absolute;left:50%;top:38%;transform:translateX(-50%);font-family:var(--font-display);font-size:30px;pointer-events:none;text-shadow:0 2px 0 var(--board-deep),0 0 8px var(--board-deep);animation:rise 1.8s ease-out forwards}
+@keyframes rise{from{opacity:0;margin-top:20px}15%{opacity:1}to{opacity:0;margin-top:-50px}}
+
+/* ---- 黒板パネル ---- */
+#panel{background:var(--board);border-left:7px solid var(--wood);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;padding:8px 10px 0;gap:2px}
+.tabs button{flex:1;background:none;border:none;border-bottom:3px solid transparent;padding:6px 0;font-family:var(--font-display);font-size:16px;color:var(--chalk-dim)}
+.tabs button.on{color:var(--chalk);border-bottom-color:var(--yellow)}
+#pane{flex:1;overflow-y:auto;padding:10px 12px 16px;display:flex;flex-direction:column;gap:8px}
+.note{font-size:12px;color:var(--chalk-dim)}
+.sec{font-family:var(--font-display);font-size:15px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card{border:1.5px solid rgba(243,241,231,.28);border-radius:5px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;transition:background .4s}
+.card.flash{background:rgba(242,211,91,.25);border-color:var(--yellow)}
+.card h4{margin:0;font-family:var(--font-display);font-weight:400;font-size:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.row.end{justify-content:flex-end}.row.start{justify-content:flex-start}
+.lv{color:var(--yellow);letter-spacing:.1em;font-size:13px}
+.b{background:none;border:1.5px solid var(--yellow);color:var(--yellow);border-radius:5px;padding:4px 10px;font-size:13px;white-space:nowrap}
+.b:hover{background:rgba(242,211,91,.15)}
+.b.sel{background:var(--yellow);color:var(--ink);font-weight:700}
+.b.plain{border-color:rgba(243,241,231,.4);color:var(--chalk)}
+.b.warn{border-color:var(--pink);color:var(--pink)}
+.b.dis{border-style:dashed;border-color:rgba(243,241,231,.25);color:rgba(243,241,231,.4);cursor:not-allowed;background:none}
+.bar{display:inline-block;width:64px;height:6px;background:rgba(243,241,231,.16);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px}
+.bar i{display:block;height:100%;background:var(--chalk)}
+.pos{color:var(--mint)}.neg{color:var(--pink)}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:3px 5px;text-align:left;white-space:nowrap;border-bottom:1px solid rgba(243,241,231,.14)}
+th{font-weight:400;color:var(--chalk-dim);font-size:12px;position:sticky;top:-10px;background:var(--board)}
+td.num,th.num{text-align:right}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.tal{color:var(--yellow);font-size:11px;letter-spacing:.05em}
+
+/* ---- お知らせプリント（モーダル） ---- */
+#ov{position:absolute;inset:0;background:rgba(14,26,22,.62);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#ov.show{display:flex}
+#sheet{background:var(--paper);color:var(--ink);width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;padding:22px 24px 18px;border-radius:2px;box-shadow:0 10px 30px rgba(0,0,0,.45);position:relative;transform:rotate(-.4deg)}
+#sheet::before{content:"";position:absolute;top:-9px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:#c8443c;box-shadow:0 2px 3px rgba(0,0,0,.4)}
+#m-kicker{font-size:11px;letter-spacing:.3em;color:#6a7a72;border-bottom:1px solid #c9cfc6;padding-bottom:4px;margin-bottom:8px;display:flex;justify-content:space-between}
+#m-title{font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 0 8px;text-wrap:balance}
+#m-body{overflow-y:auto;font-size:14px}
+#m-body p{margin:0 0 8px}
+#m-body ul{margin:0 0 8px;padding-left:20px}
+#m-body table{font-size:13px}
+#m-body th{background:var(--paper);color:#6a7a72;top:0}
+#m-body th,#m-body td{border-bottom:1px solid #dcdfd6}
+#m-body .pos{color:#197a4b;font-weight:700}#m-body .neg{color:#c0392b;font-weight:700}
+#m-body .sub{color:#6a7a72;font-size:12px}
+#m-body input{width:100%;padding:8px 10px;font:inherit;font-size:16px;border:1.5px solid var(--ink);border-radius:3px;background:#fff;color:var(--ink);margin-top:4px}
+#m-btns{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+#m-btns button{background:var(--board);color:var(--chalk);border:none;border-radius:4px;padding:9px 12px;font-size:14px;text-align:left}
+#m-btns button:hover{background:var(--board-deep)}
+#m-btns button:focus-visible{outline-color:#c8443c}
+
+@media (max-width:860px){
+  main{grid-template-columns:1fr;grid-template-rows:44% 56%}
+  #panel{border-left:none;border-top:7px solid var(--wood)}
+  #log,#hint{display:none}#legend{max-width:96%}
+  #hud{padding:6px 12px;gap:4px 14px}#h-name{font-size:18px}.stats{gap:12px}.stats dd{font-size:15px}
+  .spd{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){.float{animation-duration:.01s}.card{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="who"><span id="h-name" class="disp">みらい塾</span><span id="h-rank" class="chip"></span></div>
+    <div class="date"><span id="h-date" class="disp"></span><div class="prog"><i id="h-prog"></i></div></div>
+    <dl class="stats">
+      <div><dt>資金</dt><dd id="h-money"></dd></div>
+      <div><dt>生徒／定員</dt><dd id="h-stu"></dd></div>
+      <div><dt>評判</dt><dd id="h-rep"></dd></div>
+      <div><dt>ブランド</dt><dd id="h-brand"></dd></div>
+    </dl>
+    <div class="spd" role="group" aria-label="時間の速さ">
+      <button type="button" data-spd="0">停止</button><button type="button" data-spd="1">等速</button><button type="button" data-spd="2">2倍</button><button type="button" data-spd="4">4倍</button><button type="button" data-act="skip">翌月へ</button>
+    </div>
+  </header>
+  <main>
+    <div id="stage">
+      <canvas id="gl" aria-label="塾の3Dビュー"></canvas>
+      <div id="nogl" hidden>このブラウザでは3D表示（WebGL）が使えません。右のパネルだけでも経営は続けられます。</div>
+      <div id="hint">ドラッグで回転・ホイール／ピンチで拡大・部屋をクリックで選択</div>
+      <button type="button" id="camreset">視点を戻す</button>
+      <div id="log" aria-live="polite"></div>
+      <div id="legend"></div>
+    </div>
+    <aside id="panel">
+      <div class="tabs" role="tablist">
+        <button type="button" data-tab="fac">施設</button><button type="button" data-tab="tea">講師</button><button type="button" data-tab="stu">生徒</button><button type="button" data-tab="biz">経営</button><button type="button" data-tab="his">実績</button>
+      </div>
+      <div id="pane"></div>
+    </aside>
+  </main>
+  <div id="ov"><div id="sheet" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div id="m-kicker"><span>塾長へのお知らせ</span><span id="m-date"></span></div>
+    <h2 id="m-title"></h2><div id="m-body"></div><div id="m-btns"></div>
+  </div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* ================= ゲームロジック ================= */
+const MONTH_MS=10000; // 1か月 = 現実10秒（等速）
+const CAL=[4,5,6,7,8,9,10,11,12,1,2,3];
+const GRADES=['中1','中2','中3'];
+const TIERS=[{n:'最難関校',th:68,pt:10},{n:'難関校',th:62,pt:6},{n:'上位校',th:55,pt:3},{n:'中堅校',th:48,pt:1.5},{n:'一般校',th:40,pt:0.5}];
+const FEES=[{n:'安い',v:3,mul:1.25,sat:8},{n:'普通',v:4,mul:1,sat:0},{n:'高い',v:5,mul:0.75,sat:-10}];
+const ADS=[{n:'なし',c:0,b:0},{n:'チラシ',c:5,b:2},{n:'Web広告',c:12,b:4},{n:'駅前看板',c:25,b:7}];
+const FAC={study:{n:'自習室',d:'学力の伸び +10%/Lv'},ict:{n:'ICTルーム',d:'学力の伸び +8%/Lv'},meet:{n:'面談室',d:'満足度 +4/Lv・面談効果UP'},lounge:{n:'ラウンジ',d:'満足度 +6/Lv'}};
+const FAC_COST=[100,180,300];
+const CLS_BUILD=[0,150,250,400];
+const CLS_UP=[0,80,160];
+const T_CAP=12;
+const SEI=['佐藤','鈴木','高橋','田中','伊藤','渡辺','山本','中村','小林','加藤','吉田','山田','佐々木','松本','井上','木村','林','清水','斎藤','山口','森','池田','橋本','阿部','石川','前田','藤田','小川','岡田','後藤'];
+const MEI=['蓮','陽翔','湊','樹','悠真','大和','颯太','陽葵','結菜','凛','咲良','葵','芽依','紬','翔','健太','美咲','優奈','直樹','彩花','拓海','七海','悠人','心春','大輝','莉子','海斗','さくら','陸','ひなた'];
+let G=null;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rnd(a,b){return a+Math.random()*(b-a);}
+function ri(a,b){return Math.floor(rnd(a,b+1));}
+function gauss(){let s=0;for(let i=0;i<6;i++)s+=Math.random();return (s-3)/0.707;}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function avg(a,f){return a.length?a.reduce((x,y)=>x+f(y),0)/a.length:0;}
+function r1(v){return Math.round(v*10)/10;}
+function addLog(t){G.log.unshift('['+G.year+'年'+CAL[G.month]+'月] '+t);if(G.log.length>60)G.log.pop();}
+function mkStudent(grade){
+  const talent=clamp(Math.round(40+G.brand*0.35+gauss()*15),5,99);
+  const dev=clamp(33+talent*0.27+gauss()*3+grade*2,30,72);
+  return {id:G.uid++,name:pick(SEI)+' '+pick(MEI),grade:grade,talent:talent,dev:dev,sat:60+gauss()*5};
+}
+function mkTeacher(){
+  const skill=clamp(Math.round(32+G.rep*0.2+gauss()*14),15,95);
+  const ch=ri(20,90);
+  return {id:G.uid++,name:pick(SEI)+'先生',skill:skill,char:ch,pot:r1(rnd(0.6,1.5)),sal:Math.round(4+skill*0.18+ch*0.04),trained:false};
+}
+function cleanName(s){return String(s==null?'':s).replace(/[<>&"'`]/g,'').trim().slice(0,24);}
+function newGame(name){
+  G={name:cleanName(name)||'みらい塾',year:0,month:0,money:300,rep:20,brand:10,fee:1,ad:0,students:[],teachers:[],cands:[],cls:[1,0,0,0],fac:{study:0,ict:0,meet:0,lounge:0},log:[],hist:[],debt:0,over:false,exam:null,last:{inc:0,cost:0},uid:1};
+  const t=mkTeacher();t.skill=45;t.char=55;t.pot=1;t.sal=15;G.teachers.push(t);
+  [0,0,0,1,1,1,2,2].forEach(g=>G.students.push(mkStudent(g)));
+  G.cands=[mkTeacher(),mkTeacher(),mkTeacher()];
+  addLog('「'+G.name+'」開校！ 生徒8人・講師1人からのスタート。');
+}
+function seats(){return G.cls.reduce((s,l)=>s+(l>0?8+4*l:0),0);}
+function tCap(){return G.teachers.length*T_CAP;}
+function crowdT(){const n=G.students.length;if(!n)return 1;if(!G.teachers.length)return 0;return Math.pow(Math.min(1,tCap()/n),0.7);}
+function teachQ(){if(!G.teachers.length)return 0.25;return avg(G.teachers,t=>t.skill)/50*crowdT();}
+function clsAvg(){const b=G.cls.filter(l=>l>0);return avg(b,l=>l);}
+function facMul(){return 1+0.10*G.fac.study+0.08*G.fac.ict+0.04*(clsAvg()-1);}
+function rent(){return 6+G.cls.reduce((s,l)=>s+(l>0?4+2*l:0),0)+3*(G.fac.study+G.fac.ict+G.fac.meet+G.fac.lounge);}
+function salaries(){return G.teachers.reduce((s,t)=>s+t.sal,0);}
+function income(){return G.students.length*FEES[G.fee].v;}
+function costs(){return salaries()+rent()+ADS[G.ad].c;}
+function tierOf(dev){for(let i=0;i<TIERS.length;i++)if(dev>=TIERS[i].th)return i;return -1;}
+function stars(t){const n=Math.ceil(t/20);return '★'.repeat(n)+'☆'.repeat(5-n);}
+function rankName(){const s=G.rep*0.6+G.students.length*0.5;return s<25?'小さな個人塾':s<45?'町の学習塾':s<65?'地域の人気塾':s<85?'名門進学塾':'伝説の塾';}
+function ev(title,html){return {title:title,html:html};}
+function satTarget(){
+  const ch=G.teachers.length?avg(G.teachers,t=>t.char):30, sk=G.teachers.length?avg(G.teachers,t=>t.skill):30;
+  return 50+(ch-50)*0.35+(sk-50)*0.1+G.fac.lounge*6+G.fac.meet*4+(clsAvg()-1)*3-(1-crowdT())*40+FEES[G.fee].sat;
+}
+function boostAll(b){
+  const q=clamp(teachQ(),0.4,1.7);
+  G.students.forEach(s=>{s.dev=clamp(s.dev+b*(0.5+s.talent/100)*q*(s.grade===2?1.3:1)*clamp((82-s.dev)/34,0.1,1.2),25,80);});
+}
+function monthlySim(){
+  const inc=income(),cost=costs();
+  G.money+=inc-cost;G.last={inc:inc,cost:cost};
+  const q=teachQ(),f=facMul(),st=satTarget();
+  G.students.forEach(s=>{
+    let g=(0.08+s.talent/100*0.4)*q*f*clamp((82-s.dev)/34,0.08,1.3)*(0.7+s.sat/200)*(s.grade===2?1.15:1)+gauss()*0.12;
+    s.dev=clamp(s.dev+g,25,80);
+    s.sat=clamp(s.sat+(st-s.sat)*0.15+gauss()*2,0,100);
+  });
+  G.teachers.forEach(t=>{t.skill=clamp(t.skill+0.15*t.pot,0,100);t.trained=false;});
+  // 退塾
+  const quit=G.students.filter(s=>s.sat<30&&Math.random()<0.12);
+  if(quit.length){G.students=G.students.filter(s=>quit.indexOf(s)<0);G.rep=clamp(G.rep-0.4*quit.length,0,100);addLog('不満がたまり '+quit.length+'人が退塾…（'+quit.map(s=>s.name).join('、')+'）');}
+  // 評判の微変動
+  if(G.students.length)G.rep=clamp(G.rep+(avg(G.students,s=>s.sat)-55)*0.01,0,100);
+  // 途中入塾
+  if(G.month<10&&G.students.length<seats()&&Math.random()<(G.rep/250+G.ad*0.08)*FEES[G.fee].mul){
+    const s=mkStudent(G.month>6?ri(0,1):ri(0,2));G.students.push(s);addLog(''+s.name+'（'+GRADES[s.grade]+'）が途中入塾！');
+  }
+  if(G.money<0){G.debt++;addLog('資金がマイナス！（'+G.debt+'/6か月で倒産）');}else G.debt=0;
+}
+function mockEvent(no){
+  let h='<p>全学年で模試を実施しました。</p><table><tr><th>学年</th><th>人数</th><th>平均偏差値</th><th>最高</th></tr>';
+  GRADES.forEach((g,i)=>{const a=G.students.filter(s=>s.grade===i);h+='<tr><td>'+g+'</td><td>'+a.length+'</td><td>'+(a.length?r1(avg(a,s=>s.dev)):'-')+'</td><td>'+(a.length?r1(Math.max.apply(null,a.map(s=>s.dev))):'-')+'</td></tr>';});
+  h+='</table>';
+  const j=G.students.filter(s=>s.grade===2);
+  if(j.length){h+='<p><b>中3の合格圏（現時点）</b><br>';const c=[0,0,0,0,0,0];j.forEach(s=>{const t=tierOf(s.dev);c[t<0?5:t]++;});
+    TIERS.forEach((t,i)=>{h+=t.n+'：'+c[i]+'人　';});h+='圏外：'+c[5]+'人</p>';}
+  if(G.students.length){const top=G.students.slice().sort((a,b)=>b.dev-a.dev)[0];h+='<p>塾内トップ：'+top.name+'（'+GRADES[top.grade]+'・偏差値'+r1(top.dev)+'）</p>';}
+  return ev('第'+no+'回 模試の結果',h);
+}
+function courseEvent(summer){
+  const n=G.students.length;
+  if(!G.teachers.length||!n)return ev(summer?'夏期講習':'冬期講習','講師か生徒がいないため、今年は実施できませんでした。');
+  const A=summer?{c:Math.round(10+n*0.5),i:Math.round(n*3),b:0.8,l:'通常講習'}:{c:Math.round(8+n*0.4),i:Math.round(n*2),b:0.6,l:'通常講習'};
+  const B=summer?{c:Math.round(30+n*1.5),i:Math.round(n*5),b:1.8,l:'特訓合宿'}:{c:Math.round(20+n),i:Math.round(n*3.5),b:1.2,l:'直前特訓'};
+  const run=(o,hard)=>()=>{G.money+=o.i-o.c;boostAll(o.b);if(hard)G.students.forEach(s=>s.sat=clamp(s.sat-4,0,100));addLog((summer?'夏期':'冬期')+o.l+'を実施。収支 +'+(o.i-o.c)+'万円、学力アップ！');};
+  return {title:summer?'夏期講習の計画':'冬期講習の計画',html:'<p>季節講習をどうしますか？（生徒 '+n+'人）</p><p class="sub">特訓系は学力が大きく伸びるが、生徒の満足度が少し下がる。</p>',choices:[
+    {label:A.l+'（費用'+A.c+'万 / 売上'+A.i+'万 / 学力↑）',act:run(A,false)},
+    {label:B.l+'（費用'+B.c+'万 / 売上'+B.i+'万 / 学力↑↑ / 満足度-4）',act:run(B,true)},
+    {label:'実施しない',act:()=>{addLog('季節講習は見送った。');}}]};
+}
+function meetEvent(){
+  const n=G.students.length;if(!n)return null;
+  const low=G.students.filter(s=>s.sat<40).length,c=Math.round(n*0.3+2);
+  return {title:'保護者面談',html:'<p>保護者面談の季節です。現在の平均満足度：<b>'+Math.round(avg(G.students,s=>s.sat))+'</b>（不満あり：'+low+'人）</p>',choices:[
+    {label:'一人ひとり丁寧に面談（費用'+c+'万 / 満足度↑↑）',act:()=>{G.money-=c;const u=6+3*G.fac.meet;G.students.forEach(s=>s.sat=clamp(s.sat+u,0,100));addLog('丁寧な面談で満足度 +'+u);}},
+    {label:'簡易面談で済ませる（無料 / 満足度↑）',act:()=>{const u=1+2*G.fac.meet;G.students.forEach(s=>s.sat=clamp(s.sat+u,0,100));addLog('簡易面談を実施。満足度 +'+u);}}]};
+}
+function examEvent(){
+  const j=G.students.filter(s=>s.grade===2).sort((a,b)=>b.dev-a.dev);
+  if(!j.length){G.exam={n:0,pts:0,first:0,c:[0,0,0,0,0,0]};return ev('高校受験','今年は受験生（中3）がいませんでした。');}
+  const c=[0,0,0,0,0,0];let pts=0,first=0;
+  let rows='';
+  j.forEach(s=>{
+    let t=tierOf(s.dev+1.5);if(t<0)t=TIERS.length-1;
+    const p=1/(1+Math.exp(-(s.dev-TIERS[t].th+1)/2));
+    let res,ok=Math.random()<p;
+    if(ok){res=t;first++;}else res=(t+1<TIERS.length)?t+1:-1;
+    if(res<0){c[5]++;pts-=2;}else{c[res]++;pts+=TIERS[res].pt;}
+    rows+='<tr><td>'+s.name+'</td><td>'+r1(s.dev)+'</td><td>'+TIERS[t].n+'</td><td>'+(ok?'<span class="pos">合格</span>':res<0?'<span class="neg">不合格…</span>':'<span class="neg">✕</span>→'+TIERS[res].n)+'</td></tr>';
+  });
+  G.exam={n:j.length,pts:pts,first:first,c:c};
+  let h='<p>受験者 <b>'+j.length+'人</b>／第一志望合格 <b>'+first+'人</b>（'+Math.round(first/j.length*100)+'%）</p><p>';
+  TIERS.forEach((t,i)=>{if(c[i])h+=t.n+' '+c[i]+'人　';});if(c[5])h+='全落ち '+c[5]+'人';
+  h+='</p><table><tr><th>名前</th><th>偏差値</th><th>第一志望</th><th>結果</th></tr>'+rows+'</table>';
+  addLog('受験結果：第一志望合格 '+first+'/'+j.length+'人（最難関'+c[0]+'・難関'+c[1]+'）');
+  return ev('高校受験の結果',h);
+}
+function gradEvent(){
+  const e=G.exam||{n:0,pts:0,first:0,c:[0,0,0,0,0,0]};
+  const oR=G.rep,oB=G.brand;
+  if(e.n){
+    const ap=e.pts/e.n,rate=e.first/e.n;
+    const tR=clamp(5+ap*8+rate*12+Math.min(e.n,30)*1.2,0,100),tB=clamp(ap*10+e.c[0]*3+e.c[1],0,100);
+    G.rep=G.rep*0.5+tR*0.5;G.brand=G.brand*0.5+tB*0.5;
+  }else{G.rep=clamp(G.rep-3,0,100);G.brand=clamp(G.brand-3,0,100);}
+  G.hist.push({year:G.year,n:e.n,first:e.first,c:e.c.slice(),rep:Math.round(G.rep),brand:Math.round(G.brand),stu:G.students.length});
+  G.students=G.students.filter(s=>s.grade<2);G.exam=null;
+  const d=(a,b)=>{const x=Math.round(b)-Math.round(a);return '<span class="'+(x>=0?'pos':'neg')+'">'+(x>=0?'+':'')+x+'</span>';};
+  let h='<p>中3生 '+e.n+'人が卒業しました。今年の合格実績が地域に伝わります。</p>'+
+    '<p>⭐ 評判：'+Math.round(oR)+' → <b>'+Math.round(G.rep)+'</b>（'+d(oR,G.rep)+'）<br><span class="sub">評判が高いほど、来年度の入塾希望者が増える</span></p>'+
+    '<p>ブランド：'+Math.round(oB)+' → <b>'+Math.round(G.brand)+'</b>（'+d(oB,G.brand)+'）<br><span class="sub">難関校の合格者が多いほど、素質の高い生徒が集まる</span></p>'+
+    '<p>来月は新年度。座席数（現在 '+seats()+'席）と講師数を見直しておこう。</p>';
+  return ev('卒業と今年度の総括',h);
+}
+function aprilEvent(){
+  G.students.forEach(s=>s.grade++);
+  const want=Math.max(1,Math.round((2+G.rep*0.22+ADS[G.ad].b)*FEES[G.fee].mul*rnd(0.8,1.2)));
+  const free=seats()-G.students.length,n=Math.max(0,Math.min(want,free));
+  const ns=[];for(let i=0;i<n;i++){const r=Math.random();const s=mkStudent(r<0.6?0:r<0.85?1:2);G.students.push(s);ns.push(s);}
+  G.cands=[mkTeacher(),mkTeacher(),mkTeacher()];
+  let h='<p>'+G.year+'年目がスタート！ 在塾生は進級しました。</p><p>入塾希望者：<b>'+want+'人</b> → 入塾：<b>'+n+'人</b>';
+  if(want>n)h+='<br><span class="neg">満席のため '+(want-n)+'人をお断りしました…（教室の増設・強化を！）</span>';
+  h+='</p>';
+  if(n)h+='<p>新入生の平均素質：'+stars(avg(ns,s=>s.talent))+'（平均偏差値 '+r1(avg(ns,s=>s.dev))+'）</p>';
+  h+='<p>生徒数：'+G.students.length+'人 / '+seats()+'席　講師の担当枠：'+tCap()+'人分</p>';
+  if(G.students.length>tCap())h+='<p class="neg">講師が足りません！ 授業の質と満足度が下がります。</p>';
+  addLog('新年度！ '+n+'人が入塾（希望'+want+'人）。');
+  return ev(''+G.year+'年目 新年度スタート',h);
+}
+function randomEvent(){
+  const r=Math.random();
+  if(r<0.2){G.rep=clamp(G.rep-4,0,100);addLog('競合塾がオープン。評判-4');return ev('競合塾がオープン','近所に大手チェーン塾が開校した。<br><span class="neg">評判 -4</span>');}
+  if(r<0.4){G.rep=clamp(G.rep+4,0,100);addLog('口コミで話題に。評判+4');return ev('口コミで話題に','保護者の間で良い噂が広まっている！<br><span class="pos">評判 +4</span>');}
+  if(r<0.55){const c=ri(8,20);G.money-=c;addLog('エアコン修理 -'+c+'万円');return ev('エアコンが故障','急な修理が必要になった。<br><span class="neg">修理費 -'+c+'万円</span>');}
+  if(r<0.7){G.students.forEach(s=>s.sat=clamp(s.sat+6,0,100));addLog('塾内イベント成功。満足度+6');return ev('塾内イベントが大成功','生徒たちが楽しんでくれた！<br><span class="pos">全員の満足度 +6</span>');}
+  if(r<0.85){const c=G.teachers.filter(t=>t.skill>=55);if(c.length){const x=pick(c),up=Math.round(x.sal*0.25);
+    return {title:'講師に引き抜きの話',html:'<p><b>'+x.name+'</b>（指導力'+Math.round(x.skill)+'）に、他塾から引き抜きの話が来ているらしい。</p>',choices:[
+      {label:'昇給して引き留める（給料 +'+up+'万/月）',act:()=>{x.sal+=up;addLog(''+x.name+'を昇給で引き留めた。');}},
+      {label:'本人に任せる',act:()=>{if(Math.random()<0.7){G.teachers=G.teachers.filter(t=>t!==x);addLog(''+x.name+'は他塾へ移ってしまった…');}else addLog(''+x.name+'は残ってくれた！');}}]};}}
+  const c=ri(10,25);G.money+=c;G.rep=clamp(G.rep+3,0,100);addLog('新聞取材。評判+3、協賛金+'+c+'万円');
+  return ev('地域新聞の取材','塾の取り組みが紹介された！<br><span class="pos">評判 +3 / 協賛金 +'+c+'万円</span>');
+}
+function advanceMonth(){
+  if(G.over)return [];
+  monthlySim();
+  const evs=[];
+  if(G.debt>=6){G.over=true;return [{title:'倒産…',html:'<p>資金繰りが行き詰まり、「'+G.name+'」は閉校となった。</p><p>運営期間：'+G.year+'年'+G.month+'か月<br>最終評判：'+Math.round(G.rep)+'</p>',over:true}];}
+  G.month++;if(G.month>=12){G.month=0;G.year++;}
+  const m=G.month;let e=null;
+  if(m===0)e=aprilEvent();
+  else if(m===2)e=mockEvent(1);
+  else if(m===3)e=courseEvent(true);
+  else if(m===6)e=mockEvent(2);
+  else if(m===7)e=meetEvent();
+  else if(m===8)e=courseEvent(false);
+  else if(m===9)e=mockEvent(3);
+  else if(m===10)e=examEvent();
+  else if(m===11)e=gradEvent();
+  else if(Math.random()<0.3)e=randomEvent();
+  if(e)evs.push(e);
+  if(m%3===0&&m!==0){G.cands=[mkTeacher(),mkTeacher(),mkTeacher()];addLog('講師の応募者リストが更新された。');}
+  return evs;
+}
+/* ---- プレイヤーの行動 ---- */
+function pay(c){if(G.money<c)return false;G.money-=c;return true;}
+const ACT={
+  buildClass(i){i=+i;if(G.cls[i]>0)return;const n=G.cls.filter(l=>l>0).length;if(!pay(CLS_BUILD[n]))return;G.cls[i]=1;addLog('教室'+(i+1)+'を増設！（+12席）');},
+  upClass(i){i=+i;const l=G.cls[i];if(l<1||l>=3||!pay(CLS_UP[l]))return;G.cls[i]++;addLog('教室'+(i+1)+'をLv'+G.cls[i]+'に強化！（+4席）');},
+  upFac(k){const l=G.fac[k];if(l>=3||!pay(FAC_COST[l]))return;G.fac[k]++;addLog(''+FAC[k].n+(l?'をLv'+G.fac[k]+'に強化！':'を設置！'));},
+  hire(i){const t=G.cands[+i];if(!t||!pay(t.sal))return;G.cands.splice(+i,1);G.teachers.push(t);addLog(''+t.name+'を採用！（指導力'+Math.round(t.skill)+'）');},
+  fire(i){const t=G.teachers[+i];if(!t)return;G.teachers.splice(+i,1);addLog(''+t.name+'との契約を終了した。');},
+  train(i){const t=G.teachers[+i];if(!t||t.trained)return;if(!pay(trainCost(t)))return;const g=rnd(2,4)*t.pot*clamp((100-t.skill)/50,0.1,1.2);t.skill=clamp(t.skill+g,0,100);t.sal+=1;t.trained=true;addLog(''+t.name+'が研修を受けた。指導力 +'+r1(g));},
+  refresh(){if(!pay(10))return;G.cands=[mkTeacher(),mkTeacher(),mkTeacher()];addLog('求人広告を出した。新しい応募者が来た。');},
+  fee(i){G.fee=+i;},
+  ad(i){G.ad=+i;}
+};
+function trainCost(t){return Math.round(20+t.skill*0.4);}
+
+/* ================= 3Dシーン（three.js） ================= */
+const DEV_HEX=[0x9aa0a6,0x4895ef,0x52b788,0xe9c46a,0xf4a261,0xe63946];
+const DEV_LABEL=['〜39','40〜','48〜','55〜','62〜','68〜'];
+function devIdx(d){return d>=68?5:d>=62?4:d>=55?3:d>=48?2:d>=40?1:0;}
+const FKEYS=['study','ict','meet','lounge'];
+const COLS=[-9.6,-3.2,3.2,9.6],ZB=-4.2,ZF=4.2;
+const SEASON={
+  spring:{sky:0xcfe9f7,ground:0x9ccf7a,leaf:0xf7b7c8,fall:0xffc9d6},
+  summer:{sky:0x9fd3f5,ground:0x7fc06a,leaf:0x4f9d5d,fall:null},
+  autumn:{sky:0xf2dcc0,ground:0xb9b46a,leaf:0xd9822b,fall:0xe08a3c},
+  winter:{sky:0xb9cbd8,ground:0xd3dde4,leaf:0xeef3f6,fall:0xffffff}};
+function seasonOf(){const m=CAL[G.month];return m>=3&&m<=5?'spring':m>=6&&m<=8?'summer':m>=9&&m<=11?'autumn':'winter';}
+const V3={ok:false,reduce:false};
+let renderer,scene,camera,gRooms,foliageMat,groundMat,fallPts,signCv,signTex,signName=null;
+let picks=[],anim={stu:[],tea:[]},disposables=[];
+const CAM0={az:0.5,pol:0.93,rad:28};
+const cam={az:CAM0.az,pol:CAM0.pol,rad:CAM0.rad,fit:1,tx:0,ty:0.6,tz:0.8};
+const GEO={},matCache={};
+function mat(c){return matCache[c]||(matCache[c]=new THREE.MeshLambertMaterial({color:c}));}
+function mesh(geo,c,x,y,z,p,sx,sy,sz){const m=new THREE.Mesh(geo,typeof c==='number'?mat(c):c);m.position.set(x,y,z);if(sx!=null)m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;p.add(m);return m;}
+function box(w,h,d,c,x,y,z,p){return mesh(GEO.box,c,x,y,z,p,w,h,d);}
+function cyl(r,h,c,x,y,z,p){return mesh(GEO.cyl,c,x,y,z,p,r,h,r);}
+function ball(r,c,x,y,z,p){return mesh(GEO.sph,c,x,y,z,p,r,r,r);}
+const HAIR=[0x2b1d14,0x3a2a1a,0x1f1f24,0x4a3424];
+function person(p,x,y,z,body,standing,seed){
+  const g=new THREE.Group();g.position.set(x,y,z);
+  const h=standing?0.95:0.5,r=standing?0.2:0.17;
+  cyl(r,h,body,0,h/2,0,g);ball(0.17,0xffdfc0,0,h+0.15,0,g);mesh(GEO.hair,HAIR[seed%HAIR.length],0,h+0.17,0,g);
+  p.add(g);return g;
+}
+function plant(p,x,z){cyl(0.18,0.3,0xa8643c,x,0.15,z,p);ball(0.34,0x3f8f55,x,0.62,z,p);}
+function shelf(p,x,z,rot){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot||0;box(1.4,1.3,0.35,0x9c6b3f,0,0.65,0,g);[0x4895ef,0xe9c46a,0xe63946,0x52b788].forEach((c,i)=>{box(0.26,0.3,0.3,c,-0.48+i*0.32,0.45+(i%2)*0.45,0.05,g);});p.add(g);}
+function label(text){
+  const c=document.createElement('canvas');c.width=512;c.height=112;const x=c.getContext('2d');
+  const r=26;x.beginPath();x.moveTo(r+4,4);x.arcTo(508,4,508,108,r);x.arcTo(508,108,4,108,r);x.arcTo(4,108,4,4,r);x.arcTo(4,4,508,4,r);x.closePath();
+  x.fillStyle='rgba(26,49,41,.9)';x.fill();x.strokeStyle='rgba(243,241,231,.75)';x.lineWidth=3;x.stroke();
+  x.fillStyle='#f3f1e7';x.font='46px "Yusei Magic","Zen Maru Gothic",sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(text,256,60,470);
+  const t=new THREE.CanvasTexture(c),m=new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}),s=new THREE.Sprite(m);
+  s.scale.set(4.4,0.96,1);s.renderOrder=10;disposables.push(t,m);return s;
+}
+function shell(g,floorC,wallC,backH,doorZ){
+  const f=box(6,0.2,6,floorC,0,-0.1,0,g);
+  box(0.15,1,6,wallC,-2.925,0.5,0,g);box(0.15,1,6,wallC,2.925,0.5,0,g);
+  box(6,backH,0.15,wallC,0,backH/2,-doorZ*2.925,g);
+  box(2.1,0.6,0.15,wallC,-1.95,0.3,doorZ*2.925,g);box(2.1,0.6,0.15,wallC,1.95,0.3,doorZ*2.925,g);
+  return f;
+}
+function lot(g,text){
+  const f=box(6,0.12,6,0xb9a98a,0,-0.14,0,g);
+  [[-2.5,-2.5],[2.5,-2.5],[-2.5,2.5],[2.5,2.5]].forEach(p=>{mesh(GEO.cone,0xf08a3c,p[0],0.2,p[1],g,0.18,0.5,0.18);});
+  const s=label(text);s.position.set(0,1.5,0);g.add(s);return f;
+}
+function classroom(g,lv,i,stu,teachers){
+  const f=shell(g,[0xe6cfa0,0xdcc08a,0xd2b072][lv-1],0xf4eee0,2.5,1);
+  box(3.9,1.35,0.08,0x8a5a33,0,1.45,-2.82,g);box(3.65,1.1,0.1,0x2f5d4c,0,1.45,-2.8,g);
+  box(3.9,0.12,0.9,0xb98a58,0,0.06,-2.15,g);
+  if(lv>=2)shelf(g,2.2,-2.55,0);
+  if(lv>=3){plant(g,-2.5,-2.5);const ck=cyl(0.25,0.06,0xffffff,-2.35,2.1,-2.8,g);ck.rotation.x=Math.PI/2;}
+  const cap=8+4*lv;let used=0;
+  for(let d=0;d<cap;d++){
+    const c=d%5,r=Math.floor(d/5),x=-2.2+c*1.1,z=-0.95+r*0.98;
+    box(0.78,0.06,0.46,0xc9a06a,x,0.56,z,g);box(0.7,0.5,0.04,0xa47c4c,x,0.27,z-0.2,g);
+    if(stu.length){const s=stu.shift();const pg=person(g,x,0,z+0.45,mat(DEV_HEX[devIdx(s.dev)]),false,s.id);anim.stu.push({g:pg,ph:s.id*1.7});used++;}
+  }
+  teachers.forEach((t,k)=>{const bx=(k-(teachers.length-1)/2)*1.25;const pg=person(g,bx,0.12,-2.15,mat(0x1d3557),true,t.id);anim.tea.push({g:pg,bx:bx,ph:t.id*2.3,amp:teachers.length>2?0.25:0.7});});
+  const s=label('教室'+(i+1)+'  Lv'+lv+'  '+used+'/'+cap+'席');s.position.set(0,3.5,-2.6);g.add(s);
+  return f;
+}
+function facility(g,k,lv){
+  let f;
+  if(k==='study'){
+    f=shell(g,0xb7cbe0,0xeef2f6,1,-1);
+    for(let r=0;r<lv;r++)for(let c=0;c<3;c++){const x=-1.8+c*1.8,z=-1.2+r*1.5;
+      box(1.0,0.06,0.6,0xd8c29a,x,0.56,z,g);box(1.08,0.95,0.05,0x6d8fb3,x,0.48,z+0.32,g);box(0.05,0.95,0.7,0x6d8fb3,x-0.54,0.48,z,g);box(0.05,0.95,0.7,0x6d8fb3,x+0.54,0.48,z,g);box(0.3,0.04,0.22,0xffffff,x,0.61,z-0.05,g);}
+    if(lv>=2)shelf(g,-2.6,2.0,Math.PI/2);
+  }else if(k==='ict'){
+    f=shell(g,0xc4dcc6,0xeef4ee,1,-1);
+    for(let r=0;r<lv;r++)for(let c=0;c<3;c++){const x=-1.8+c*1.8,z=-1.2+r*1.5;
+      box(1.1,0.06,0.6,0xe6e6e6,x,0.56,z,g);box(0.08,0.56,0.5,0x9aa0a6,x-0.45,0.28,z,g);box(0.08,0.56,0.5,0x9aa0a6,x+0.45,0.28,z,g);
+      box(0.6,0.4,0.05,0x22262b,x,0.86,z+0.12,g);mesh(GEO.box,V3.screen,x,0.86,z+0.09,g,0.52,0.32,0.02).castShadow=false;box(0.4,0.03,0.16,0x44484e,x,0.6,z-0.14,g);}
+    if(lv>=3){box(0.7,1.5,0.6,0x2b2f36,2.4,0.75,2.3,g);mesh(GEO.box,V3.screen,2.04,1.0,2.3,g,0.02,0.6,0.4);}
+  }else if(k==='meet'){
+    f=shell(g,0xe6cfc6,0xf6eeea,1,-1);
+    cyl(0.1,0.6,0x7a5232,0,0.3,0,g);cyl(0.85,0.07,0xc9a06a,0,0.63,0,g);
+    const n=2+lv;for(let j=0;j<n;j++){const a=j/n*Math.PI*2;box(0.42,0.45,0.42,0xc8553d,Math.sin(a)*1.35,0.22,Math.cos(a)*1.35,g);}
+    if(lv>=2){box(1.8,0.4,0.7,0x7d9a8c,0,0.2,2.3,g);box(1.8,0.5,0.2,0x6c8a7b,0,0.55,2.62,g);}
+    if(lv>=3){shelf(g,-2.6,0,Math.PI/2);plant(g,2.5,2.4);}
+  }else{
+    f=shell(g,0xead9b0,0xf7f1e2,1,-1);
+    for(let j=0;j<lv;j++){const z=-1.2+j*1.5;box(1.9,0.38,0.75,[0xe07a5f,0x3d8d7a,0xe9c46a][j],-1.6,0.19,z,g);box(0.2,0.55,0.75,[0xc96a50,0x327565,0xd4b25c][j],-2.45,0.5,z,g);}
+    box(0.9,1.8,0.65,0xd64545,2.3,0.9,2.3,g);mesh(GEO.box,V3.screen,2.3,1.2,1.96,g,0.7,0.8,0.02);
+    if(lv>=2){box(0.9,1.8,0.65,0x3a6fd8,1.3,0.9,2.3,g);mesh(GEO.box,V3.screen,1.3,1.2,1.96,g,0.7,0.8,0.02);cyl(0.1,0.55,0x7a5232,1.4,0.27,-0.6,g);cyl(0.6,0.06,0xffffff,1.4,0.58,-0.6,g);}
+    if(lv>=3){plant(g,2.5,-2.4);plant(g,-2.5,2.5);}
+  }
+  const s=label(FAC[k].n+'  Lv'+lv);s.position.set(0,2.0,0);g.add(s);
+  return f;
+}
+function drawSign(){
+  if(signName===G.name)return;signName=G.name;
+  const x=signCv.getContext('2d');x.fillStyle='#24443a';x.fillRect(0,0,1024,256);x.strokeStyle='#f3f1e7';x.lineWidth=6;x.strokeRect(14,14,996,228);
+  x.fillStyle='#f2d35b';x.font='130px "Yusei Magic","Zen Maru Gothic",sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(G.name,512,134,940);
+  signTex.needsUpdate=true;
+}
+function initScene(){
+  const cv=document.getElementById('gl'),stage=document.getElementById('stage');
+  try{renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});}catch(e){document.getElementById('nogl').hidden=false;return;}
+  V3.reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  scene=new THREE.Scene();scene.background=new THREE.Color(SEASON.spring.sky);
+  camera=new THREE.PerspectiveCamera(40,1,0.5,300);
+  GEO.box=new THREE.BoxGeometry(1,1,1);GEO.cyl=new THREE.CylinderGeometry(1,1,1,16);GEO.sph=new THREE.SphereGeometry(1,16,12);
+  GEO.cone=new THREE.ConeGeometry(1,1,12);GEO.hair=new THREE.SphereGeometry(0.185,14,8,0,Math.PI*2,0,Math.PI/2);
+  V3.screen=new THREE.MeshBasicMaterial({color:0x9fdcff});
+  scene.add(new THREE.HemisphereLight(0xffffff,0x8a9a7a,0.58));
+  const sun=new THREE.DirectionalLight(0xfff4e0,0.62);sun.position.set(-14,26,16);sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);const sc=sun.shadow.camera;sc.left=-24;sc.right=24;sc.top=20;sc.bottom=-20;sc.near=1;sc.far=80;sun.shadow.bias=-0.0006;scene.add(sun);
+  // 地面・道路・木
+  groundMat=new THREE.MeshLambertMaterial({color:SEASON.spring.ground});
+  const gr=new THREE.Mesh(new THREE.CircleGeometry(60,48),groundMat);gr.rotation.x=-Math.PI/2;gr.position.y=-0.2;gr.receiveShadow=true;scene.add(gr);
+  const env=new THREE.Group();scene.add(env);
+  box(130,0.05,4.2,0x5c6268,0,-0.17,13.2,env);for(let i=-9;i<=9;i++)box(2,0.06,0.16,0xf3f1e7,i*5,-0.16,13.2,env);
+  box(4,0.06,3.4,0xcfc8b4,0,-0.16,9.4,env);
+  foliageMat=new THREE.MeshLambertMaterial({color:SEASON.spring.leaf});
+  [[-16,-8],[-17.5,1],[-16,9],[16,-8],[17.5,1],[16,9],[-9,-11.5],[0,-12.5],[9,-11.5],[-24,-4],[24,-4],[-22,8],[22,8]].forEach((p,i)=>{
+    const s=0.85+((i*37)%10)/25;cyl(0.28*s,2.2*s,0x7a5232,p[0],1.1*s-0.2,p[1],env);ball(1.7*s,foliageMat,p[0],3.1*s-0.2,p[1],env);ball(1.1*s,foliageMat,p[0]+0.9*s,2.5*s-0.2,p[1]+0.3,env);});
+  // 看板
+  signCv=document.createElement('canvas');signCv.width=1024;signCv.height=256;signTex=new THREE.CanvasTexture(signCv);
+  const sg=new THREE.Group();sg.position.set(-9.5,-0.2,10.4);sg.rotation.y=0.18;env.add(sg);
+  box(0.2,2.4,0.2,0x8a5a33,-2.6,1.2,0,sg);box(0.2,2.4,0.2,0x8a5a33,2.6,1.2,0,sg);box(6,1.6,0.16,0x8a5a33,0,2.1,0,sg);
+  const sm=new THREE.MeshBasicMaterial({map:signTex});
+  const p1=new THREE.Mesh(new THREE.PlaneGeometry(5.7,1.42),sm);p1.position.set(0,2.1,0.09);sg.add(p1);
+  const p2=p1.clone();p2.position.z=-0.09;p2.rotation.y=Math.PI;sg.add(p2);
+  // 花びら・落ち葉・雪
+  const N=240,pos=new Float32Array(N*3);for(let i=0;i<N;i++){pos[i*3]=(Math.random()-0.5)*46;pos[i*3+1]=Math.random()*16;pos[i*3+2]=(Math.random()-0.5)*34;}
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  fallPts=new THREE.Points(pg,new THREE.PointsMaterial({color:0xffc9d6,size:0.22,transparent:true,opacity:0.9}));scene.add(fallPts);
+  gRooms=new THREE.Group();gRooms.position.y=0;scene.add(gRooms);
+  // カメラ操作
+  const pts=new Map();let moved=0,pinch=0;
+  cv.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;try{cv.setPointerCapture(e.pointerId);}catch(_){}});
+  cv.addEventListener('pointermove',e=>{const p=pts.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+    if(pts.size===1){cam.az-=dx*0.006;cam.pol=clamp(cam.pol-dy*0.005,0.2,1.42);}
+    else if(pts.size===2){const a=[...pts.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinch)cam.rad=clamp(cam.rad*pinch/d,11,80);pinch=d;}});
+  const up=e=>{const was=pts.size;pts.delete(e.pointerId);pinch=0;if(was===1&&moved<6&&e.type==='pointerup')pickRoom(e);};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+  cv.addEventListener('wheel',e=>{e.preventDefault();cam.rad=clamp(cam.rad*Math.exp(e.deltaY*0.0012),11,80);},{passive:false});
+  document.getElementById('camreset').addEventListener('click',()=>{cam.az=CAM0.az;cam.pol=CAM0.pol;cam.rad=CAM0.rad*cam.fit;});
+  const rs=()=>{const w=stage.clientWidth||1,h=stage.clientHeight||1;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+    const fit=Math.max(1,1.5/(w/h));cam.rad=clamp(cam.rad/cam.fit*fit,11,80);cam.fit=fit;};
+  rs();if(window.ResizeObserver)new ResizeObserver(rs).observe(stage);else window.addEventListener('resize',rs);
+  V3.ok=true;
+}
+const ray=typeof THREE!=='undefined'?new THREE.Raycaster():null;
+function pickRoom(e){
+  if(!V3.ok||!picks.length)return;const r=renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
+  const hit=ray.intersectObjects(picks,false)[0];if(hit&&typeof onPickRoom==='function')onPickRoom(hit.object.userData.id);
+}
+function syncScene(){
+  if(!V3.ok||!G)return;
+  disposables.forEach(d=>d.dispose());disposables=[];
+  while(gRooms.children.length)gRooms.remove(gRooms.children[0]);
+  picks=[];anim={stu:[],tea:[]};
+  box(25.4,0.2,2.5,0xd9d2c0,0,-0.1,0,gRooms);
+  const stu=G.students.slice().sort((a,b)=>a.grade-b.grade||a.id-b.id);
+  const built=[];G.cls.forEach((l,i)=>{if(l>0)built.push(i);});
+  G.cls.forEach((lv,i)=>{
+    const g=new THREE.Group();g.position.set(COLS[i],0,ZB);gRooms.add(g);
+    const bi=built.indexOf(i);
+    const f=lv?classroom(g,lv,i,stu,G.teachers.filter((t,j)=>j%built.length===bi)):lot(g,'教室'+(i+1)+'（増設できる）');
+    f.userData.id='cls-'+i;picks.push(f);
+  });
+  FKEYS.forEach((k,i)=>{
+    const g=new THREE.Group();g.position.set(COLS[i],0,ZF);gRooms.add(g);
+    const lv=G.fac[k],f=lv?facility(g,k,lv):lot(g,FAC[k].n+'（未設置）');
+    f.userData.id='fac-'+k;picks.push(f);
+  });
+  const se=SEASON[seasonOf()];scene.background.setHex(se.sky);groundMat.color.setHex(se.ground);foliageMat.color.setHex(se.leaf);
+  fallPts.visible=!!se.fall&&!V3.reduce;if(se.fall)fallPts.material.color.setHex(se.fall);
+  drawSign();
+}
+function renderScene(t,dt){
+  if(!V3.ok)return;
+  const s=Math.sin(cam.pol);camera.position.set(cam.tx+cam.rad*s*Math.sin(cam.az),cam.ty+cam.rad*Math.cos(cam.pol),cam.tz+cam.rad*s*Math.cos(cam.az));camera.lookAt(cam.tx,cam.ty,cam.tz);
+  if(!V3.reduce){
+    const T=t/1000;
+    anim.stu.forEach(a=>{a.g.position.y=Math.max(0,Math.sin(T*2.2+a.ph))*0.03;a.g.rotation.y=Math.sin(T*0.7+a.ph)*0.25;});
+    anim.tea.forEach(a=>{const v=Math.sin(T*0.55+a.ph);a.g.position.x=a.bx+v*a.amp;a.g.rotation.y=Math.cos(T*0.55+a.ph)*0.6;});
+    if(fallPts.visible){const p=fallPts.geometry.attributes.position,k=dt/1000;for(let i=0;i<p.count;i++){let y=p.getY(i)-k*(1.1+(i%5)*0.25);if(y<-0.2)y=16;p.setY(i,y);p.setX(i,p.getX(i)+Math.sin(T+i)*k*0.5);}p.needsUpdate=true;}
+  }
+  renderer.render(scene,camera);
+}
+
+/* ================= 画面（黒板パネル・お知らせ・進行） ================= */
+const $=id=>document.getElementById(id);
+const SAVE_KEY='juku3d-save-v1';
+let speed=1,acc=0,lastT=0,queue=[],modalOpen=false,started=false,tab='fac';
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function devCss(d){return '#'+DEV_HEX[devIdx(d)].toString(16).padStart(6,'0');}
+function satMark(s){return s>=70?'◎':s>=45?'○':s>=30?'△':'×';}
+function lvStars(l,max){return '<span class="lv">'+'★'.repeat(l)+'☆'.repeat(max-l)+'</span>';}
+function btn(label,act,arg,cost,cls){
+  const dis=cost!=null&&G.money<cost;
+  return '<button type="button" class="b'+(dis?' dis':'')+(cls?' '+cls:'')+'"'+(dis?' aria-disabled="true"':' data-act="'+act+'" data-arg="'+arg+'"')+'>'+label+(cost!=null?'（'+cost+'万）':'')+'</button>';
+}
+function bar(v){return '<span class="bar"><i style="width:'+clamp(v,0,100)+'%"></i></span>';}
+function save(){try{if(started&&G&&!G.over)localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,G:G}));else localStorage.removeItem(SAVE_KEY);}catch(e){}}
+function validG(g){return !!g&&Array.isArray(g.students)&&Array.isArray(g.teachers)&&Array.isArray(g.cands)&&Array.isArray(g.cls)&&g.cls.length===4&&!!g.fac&&Array.isArray(g.log)&&Array.isArray(g.hist)&&isFinite(g.money)&&isFinite(g.year)&&g.month>=0&&g.month<12&&!g.over;}
+function cleanG(g){g.name=cleanName(g.name)||'みらい塾';g.students.concat(g.teachers,g.cands).forEach(x=>{x.name=cleanName(x.name);});return g;}
+function loadSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');return d&&d.v===1&&validG(d.G)?cleanG(d.G):null;}catch(e){return null;}}
+
+function paneFac(){
+  let h='<div class="note">教室が生徒の定員になる。講師1人で'+T_CAP+'人まで担当できる。</div>';
+  const built=G.cls.filter(l=>l>0).length;
+  G.cls.forEach((l,i)=>{
+    h+='<div class="card" id="card-cls-'+i+'"><div class="row"><h4>教室'+(i+1)+' '+(l?lvStars(l,3):'')+'</h4>'+
+      (l===0?btn('増設する','buildClass',i,CLS_BUILD[built]):l<3?btn('強化 +4席','upClass',i,CLS_UP[l]):'<span class="note">最大レベル</span>')+
+      '</div><div class="note">'+(l?(8+4*l)+'席・維持費 '+(4+2*l)+'万/月':'空きスペース。増設すると12席ふえる')+'</div></div>';
+  });
+  h+='<div class="sec">特別施設</div>';
+  FKEYS.forEach(k=>{const l=G.fac[k],f=FAC[k];
+    h+='<div class="card" id="card-fac-'+k+'"><div class="row"><h4>'+f.n+' '+(l?lvStars(l,3):'')+'</h4>'+(l<3?btn(l?'強化する':'設置する','upFac',k,FAC_COST[l]):'<span class="note">最大レベル</span>')+'</div><div class="note">'+f.d+'・維持費 3万/Lv</div></div>';});
+  return h;
+}
+function teacherBody(t){return '<h4>'+esc(t.name)+'</h4><div>指導力'+bar(t.skill)+Math.round(t.skill)+'　人気'+bar(t.char)+t.char+'</div><div class="note">給料 '+t.sal+'万/月・成長性 '+(t.pot>=1.2?'◎':t.pot>=0.9?'○':'△')+'</div>';}
+function paneTea(){
+  const over=G.students.length>tCap();
+  let h='<div class="note">指導力は学力の伸びに、人気は満足度に効く。担当 '+G.students.length+' / '+tCap()+'人'+(over?' <span class="neg">講師が足りない</span>':'')+'</div><div class="sec">在籍講師</div>';
+  if(!G.teachers.length)h+='<div class="card neg">講師がいない。授業の質が大きく下がっている。</div>';
+  G.teachers.forEach((t,i)=>{h+='<div class="card">'+teacherBody(t)+'<div class="row end">'+(t.trained?'<span class="note">今月は研修済み</span>':btn('研修に出す','train',i,trainCost(t)))+btn('解雇','fire',i,null,'warn')+'</div></div>';});
+  h+='<div class="sec"><span>応募者 <span class="note">3か月ごとに入れ替わる</span></span>'+btn('求人を出す','refresh','',10,'plain')+'</div>';
+  if(!G.cands.length)h+='<div class="note">いま応募者はいない。</div>';
+  G.cands.forEach((t,i)=>{h+='<div class="card">'+teacherBody(t)+'<div class="row end">'+btn('採用する','hire',i,t.sal)+'</div></div>';});
+  return h;
+}
+function paneStu(){
+  if(!G.students.length)return '<div class="note">生徒がいない。評判と広告で入塾希望者を集めよう。</div>';
+  let h='<table><tr><th>名前</th><th>学年</th><th class="num">偏差値</th><th>素質</th><th>満足</th></tr>';
+  G.students.slice().sort((a,b)=>b.grade-a.grade||b.dev-a.dev).forEach(s=>{
+    h+='<tr><td><span class="dot" style="background:'+devCss(s.dev)+'"></span>'+esc(s.name)+'</td><td>'+GRADES[s.grade]+'</td><td class="num">'+s.dev.toFixed(1)+'</td><td class="tal">'+stars(s.talent)+'</td><td>'+satMark(s.sat)+'</td></tr>';});
+  return h+'</table><div class="note">満足が × の生徒は退塾しやすい。</div>';
+}
+function paneBiz(){
+  const inc=income(),sal=salaries(),rt=rent(),ad=ADS[G.ad].c,net=inc-sal-rt-ad;
+  let h='<div class="card"><h4>月謝</h4><div class="row start">';
+  FEES.forEach((f,i)=>{h+=btn(f.n+' '+f.v+'万','fee',i,null,G.fee===i?'sel':'plain');});
+  h+='</div><div class="note">安いと希望者と満足度が上がり、高いと下がる。</div></div><div class="card"><h4>広告 <span class="note">毎月かかる</span></h4><div class="row start">';
+  ADS.forEach((a,i)=>{h+=btn(a.n+' '+a.c+'万','ad',i,null,G.ad===i?'sel':'plain');});
+  h+='</div><div class="note">4月の入塾希望者と、年度途中の入塾が増える。</div></div>';
+  h+='<div class="card"><h4>今月の収支見込み</h4><table><tr><td>月謝収入</td><td class="num pos">+'+r1(inc)+'万</td></tr><tr><td>講師の給料</td><td class="num neg">-'+sal+'万</td></tr><tr><td>施設の維持費</td><td class="num neg">-'+rt+'万</td></tr><tr><td>広告費</td><td class="num neg">-'+ad+'万</td></tr><tr><td>合計</td><td class="num '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+r1(net)+'万</td></tr></table></div>';
+  h+='<div class="card"><h4>塾の状態</h4><div>平均偏差値 '+(G.students.length?r1(avg(G.students,s=>s.dev)):'-')+'　平均満足度 '+(G.students.length?Math.round(avg(G.students,s=>s.sat)):'-')+'</div><div>授業の質 ×'+r1(teachQ()*facMul())+' <span class="note">講師と施設のかけ算</span></div></div>';
+  h+='<div class="row end">'+btn('最初からやり直す','restart','',null,'warn')+'</div>';
+  return h;
+}
+function paneHis(){
+  if(!G.hist.length)return '<div class="note">まだ受験実績がない。最初の高校受験は0年目の2月。</div>';
+  let h='<table><tr><th>年度</th><th class="num">受験</th><th class="num">第一志望</th><th class="num">最難関</th><th class="num">難関</th><th class="num">上位</th><th class="num">評判</th></tr>';
+  G.hist.slice().reverse().forEach(x=>{h+='<tr><td>'+x.year+'年目</td><td class="num">'+x.n+'</td><td class="num">'+x.first+'</td><td class="num">'+x.c[0]+'</td><td class="num">'+x.c[1]+'</td><td class="num">'+x.c[2]+'</td><td class="num">'+x.rep+'</td></tr>';});
+  return h+'</table><div>難関校以上の累計合格者 <span class="disp" style="font-size:20px;color:var(--yellow)">'+G.hist.reduce((s,x)=>s+x.c[0]+x.c[1],0)+'</span> 人</div>';
+}
+function renderAll(){
+  if(!G)return;
+  $('h-name').textContent=G.name;$('h-rank').textContent=rankName();
+  $('h-date').textContent=G.year+'年 '+G.month+'か月（'+CAL[G.month]+'月）';
+  $('h-money').innerHTML='<span class="'+(G.money<0?'neg':'')+'">'+Math.round(G.money)+'</span><small> 万円</small>';
+  $('h-stu').innerHTML=G.students.length+'<small> / '+seats()+'人</small>';
+  $('h-rep').textContent=Math.round(G.rep);$('h-brand').textContent=Math.round(G.brand);
+  const p=$('pane'),sc=p.scrollTop;
+  p.innerHTML=tab==='fac'?paneFac():tab==='tea'?paneTea():tab==='stu'?paneStu():tab==='biz'?paneBiz():paneHis();
+  p.scrollTop=sc;
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.querySelectorAll('[data-spd]').forEach(b=>b.classList.toggle('on',+b.dataset.spd===speed));
+  $('log').innerHTML=G.log.slice(0,25).map(l=>'<div>'+esc(l)+'</div>').join('');
+  syncScene();
+}
+/* ---- お知らせ（モーダル） ---- */
+function showModal(title,html,choices){
+  modalOpen=true;$('m-title').textContent=title;$('m-body').innerHTML=html;
+  $('m-date').textContent=G&&started?G.year+'年'+CAL[G.month]+'月':'開校準備';
+  const bx=$('m-btns');bx.innerHTML='';
+  choices.forEach(c=>{const b=document.createElement('button');b.type='button';b.textContent=c.label;b.addEventListener('click',()=>{$('ov').classList.remove('show');modalOpen=false;if(c.act)c.act();save();renderAll();nextModal();});bx.appendChild(b);});
+  $('ov').classList.add('show');$('m-body').scrollTop=0;
+  const f=$('m-body').querySelector('input')||bx.querySelector('button');if(f)f.focus();
+}
+function nextModal(){
+  if(modalOpen||!queue.length)return;
+  const e=queue.shift();
+  if(e.over)showModal(e.title,e.html,[{label:'もう一度あそぶ',act:titleScreen}]);
+  else showModal(e.title,e.html,e.choices||[{label:'確認した'}]);
+}
+function titleScreen(){
+  started=false;queue=[];
+  const sv=loadSave();
+  const ch=[{label:'開校する',act:()=>{const v=($('in-name')&&$('in-name').value.trim())||'みらい塾';newGame(v);acc=0;speed=1;started=true;}}];
+  if(sv)ch.unshift({label:'つづきから（'+sv.name+'・'+sv.year+'年'+sv.month+'か月）',act:()=>{G=sv;acc=0;speed=1;started=true;}});
+  showModal('塾長、開校の準備ができました','<p>小さな学習塾の塾長になって、教室を増やし、講師を育て、生徒を志望校合格へ導く経営シミュレーション。</p><ul><li>1か月は約10秒で進む。2倍・4倍・停止はいつでも切り替えられる</li><li>6月・10月・1月に模試、2月に高校受験、4月に新入生</li><li>合格実績で、翌年の入塾希望者数と新入生の素質が変わる</li><li>資金マイナスが6か月続くと倒産</li></ul><p><label for="in-name">塾の名前</label><input type="text" id="in-name" maxlength="12" value="みらい塾" autocomplete="off"></p><p class="sub">進行状況はこのブラウザに自動で保存される。</p>',ch);
+  const inp=$('in-name');if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const bs=$('m-btns').querySelectorAll('button');bs[bs.length-1].click();}});
+}
+/* ---- 進行 ---- */
+function floatText(t,cls){const d=document.createElement('div');d.className='float '+cls;d.textContent=t;$('stage').appendChild(d);setTimeout(()=>d.remove(),1900);}
+function step(){
+  acc=0;const evs=advanceMonth();
+  const net=G.last.inc-G.last.cost;floatText((net>=0?'+':'')+r1(net)+'万円',net>=0?'pos':'neg');
+  queue.push.apply(queue,evs);if(!evs.some(e=>e.choices))save(); // 選択肢つきのお知らせは、選んだ後に保存する（途中で閉じても選択が消えない）
+  renderAll();nextModal();
+}
+function onPickRoom(id){
+  if(!started||modalOpen)return;tab='fac';renderAll();
+  const c=$('card-'+id);if(!c)return;c.scrollIntoView({block:'center'});c.classList.add('flash');setTimeout(()=>c.classList.remove('flash'),900);
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(e.detail>0&&!b.closest('#sheet'))b.blur();
+  if(b.dataset.tab){tab=b.dataset.tab;$('pane').scrollTop=0;renderAll();return;}
+  if(b.dataset.spd!=null){speed=+b.dataset.spd;renderAll();return;}
+  const a=b.dataset.act;if(!a||!G||!started||G.over||modalOpen)return;
+  if(a==='skip'){step();return;}
+  if(a==='fire'){const t=G.teachers[+b.dataset.arg];if(!t)return;showModal('解雇の確認','<p>'+esc(t.name)+'（指導力'+Math.round(t.skill)+'）との契約を終了しますか？</p>',[{label:'やめておく'},{label:'解雇する',act:()=>ACT.fire(G.teachers.indexOf(t))}]);return;}
+  if(a==='restart'){showModal('最初からやり直す','<p>いまの塾のデータは消えます。本当にやり直しますか？</p>',[{label:'やめておく'},{label:'やり直す',act:()=>{started=false;save();setTimeout(titleScreen,0);}}]);return;}
+  if(ACT[a]){ACT[a](b.dataset.arg);save();renderAll();}
+});
+document.addEventListener('keydown',e=>{
+  if(e.code!=='Space'||modalOpen||!started||/^(INPUT|BUTTON|TEXTAREA)$/.test(e.target.tagName))return;
+  e.preventDefault();speed=speed?0:1;renderAll();
+});
+function loop(t){
+  const dt=Math.min(250,t-lastT);lastT=t;
+  if(started&&G&&!G.over&&!modalOpen&&speed>0){acc+=dt*speed;if(acc>=MONTH_MS)step();}
+  $('h-prog').style.width=(acc/MONTH_MS*100)+'%';
+  renderScene(t,dt);requestAnimationFrame(loop);
+}
+function start(data){
+  $('legend').innerHTML='<span>生徒の色は偏差値</span>'+DEV_HEX.map((c,i)=>'<span><i style="background:#'+c.toString(16).padStart(6,'0')+'"></i>'+DEV_LABEL[i]+'</span>').join('')+'<span><i style="background:#1d3557;border:1px solid #f3f1e7"></i>講師</span>';
+  newGame('みらい塾');
+  if(typeof THREE!=='undefined')initScene();else $('nogl').hidden=false;
+  if(data&&validG(data.G)){G=cleanG(data.G);started=true;renderAll();}
+  else{renderAll();titleScreen();}
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{signName=null;renderAll();});
+  requestAnimationFrame(loop);
+}
+if(window.claude&&window.claude.hot&&window.claude.hot.snapshot)window.claude.hot.snapshot(()=>started&&G&&!G.over?{G:G}:{});
+if(window.claude&&window.claude.hot&&window.claude.hot.ready)window.claude.hot.ready(start);else start((window.claude&&window.claude.hot&&window.claude.hot.data)||{});
+
+})();
+</script>
+</body>
+</html>
